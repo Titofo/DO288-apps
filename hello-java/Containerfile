@@ -1,28 +1,21 @@
-FROM   registry.access.redhat.com/ubi8/ubi:8.0
+# Use the redhattraining/httpd-parent image as base
+FROM quay.io/redhattraining/httpd-parent
 
-MAINTAINER   Red Hat Training <training@redhat.com>
-
-# command line options to pass to the JVM
-ENV	  JAVA_OPTIONS -Xmx512m
-
-
-# Install the Java runtime, create a user for running the app, and set permissions
-RUN   yum install -y --disableplugin=subscription-manager java-1.8.0-openjdk-headless && \
-      yum clean all --disableplugin=subscription-manager -y && \
-      useradd wildfly && \
-      mkdir -p /opt/app-root/bin
-
-# Copy the runnable fat JAR to the container.
-ADD   https://github.com/RedHatTraining/DO288-apps/releases/download/OCP-4.1-1/hello-java.jar /opt/app-root/bin/
-
-COPY  run-app.sh /opt/app-root/bin/
-
-RUN   chown -R wildfly:wildfly /opt/app-root && \
-      chmod -R 700 /opt/app-root
-
+# Change the port to 8080
 EXPOSE 8080
 
-USER  wildfly
+# Labels consumed by OpenShift
+LABEL io.k8s.description="A basic Apache HTTP Server child image, uses ONBUILD" \
+      io.k8s.display-name="Apache HTTP Server" \
+      io.openshift.expose-services="8080:http" \
+      io.openshift.tags="apache, httpd"
 
-# Run the fat JAR
-CMD   /opt/app-root/bin/run-app.sh
+# Change web server port to 8080
+RUN sed -i "s/Listen 80/Listen 8080/g" /etc/httpd/conf/httpd.conf
+
+# Permissions to allow container to run on OpenShift
+RUN chgrp -R 0 /var/log/httpd /var/run/httpd && \
+    chmod -R g=u /var/log/httpd /var/run/httpd
+
+# Run as a non-privileged user
+USER 1001
